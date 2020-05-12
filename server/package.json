@@ -1,0 +1,13 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Server part / API of the temperature controller",
+  "main": "server.js",
+  "repository": "https://gitlab.famnstigen.pvsweden.com/petmo/fermentation-temp-control",
+  "author": "Peter Möller",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
