@@ -4,14 +4,14 @@ const i2c = require('i2c-bus')
 // const https = require('https')
 const path = require('path')
 const express = require('express')
-const socketIO = require('socket.io' )
+// const socketIO = require('socket.io' )
 
 var gpio = require('gpio')
 var log4js = require('log4js')
 var os = require('os')
 var logger = log4js.getLogger()
 
-logger.level = 'debug'
+logger.level = 'warning'
 logger.debug("Some debug messages") 
 const MCP9808_ADDR = 0x18
 const TEMP_REG = 0x05
@@ -226,7 +226,7 @@ app.get('/', function (req, res) {
   response = {
     'hostname': localHostName,
     'timeUTC': new Date(new Date().toUTCString()),
-    'setPoint1': setpoint,
+    'setPoint1': setPoint,
     'currentTemp1': currentTemp,
     'extra': 'blah'
   }
@@ -244,7 +244,7 @@ app.get('/currentTemp', function (req, res) {
 app.get('/setPoint', function (req, res) {
   console.log(req.body)
   response = {
-    'setPoint11': setpoint
+    'setPoint1': setPoint
   }
   res.send(response)
 })
@@ -252,10 +252,11 @@ app.get('/setPoint', function (req, res) {
 app.post('/setPoint', function (req, res) {
   console.log(req.body)
   tempSP = parseFloat(req.body.setPoint1)
+  console.log(tempSP)
   if (tempSP != NaN) {
-    setpoint = tempSP
+    setPoint = tempSP
     response = {
-      'setPoint11': setpoint
+      'setPoint1': setPoint
     }
     res.send(response)
   } else {
