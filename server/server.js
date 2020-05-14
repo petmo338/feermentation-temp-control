@@ -1,10 +1,6 @@
 const i2c = require('i2c-bus')
-// const Influx = require('influx')
-// const process = require('process')
-// const https = require('https')
 const path = require('path')
 const express = require('express')
-// const socketIO = require('socket.io' )
 
 var gpio = require('gpio')
 var log4js = require('log4js')
@@ -19,11 +15,6 @@ const P = 1.00001
 var heatStatus = 1
 let setPoint = 23.123
 let currentTemp = 0
-// const measurementName = 'testOne'
-// const dbName = 'ferment'
-// const dbHost = '172.16.201.17'
-
-// const start = Date.now()
 
 const i2c2 = i2c.openSync(1)
 
@@ -37,15 +28,6 @@ const toCelsius = (rawData) => {
   logger.info(celsius) 
   return celsius
 }
-
-// process.on('beforeExit', (code) => {
-//   console.log('Process beforeExit event with code: ', code)
-//   if (i2c2) {
-//     i2c2.close((err) => {
-//       if (err) throw err
-//     })
-//   }
-// })
 
 var gpio115 = gpio.export(18, {
   direction: gpio.DIRECTION.OUT,
@@ -88,8 +70,15 @@ function disable() {
   heatStatus = 1
 }
 
-function getSetpoint(time) {
+function getSetpoint() {
   return setPoint
+}
+
+function getHeatStatusName() {
+  if (heatStatus === 0) return 'Cooling'
+  if (heatStatus === 1) return 'Off'
+  if (heatStatus === 2) return 'Heating'  
+  return 'Unknown heatStatus value' + heatStatus
 }
 
 
@@ -120,107 +109,14 @@ async function control() {
   }
 }
 
-// async function report() {
-//   var tempCelsius = await measure()
-//   logger.info(tempCelsius)
-//   influx.writePoints([
-//     {
-//       measurement: measurementName,
-//       tags: { device: 'bbb1' },
-//         fields: { tempBarrel: tempCelsius, setPoint: getSetpoint(), heatStatus: heatStatus },
-//     }
-//   ]).catch(err => {
-//     logger.error('Error saving data to InfluxDB!' + err.stack)
-//   })
-
-//   const options = new URL('https://api.thingspeak.com/update?api_key=PFJ7GCHC5UG7FX8W&field1=' + tempCelsius + '&field2=' + getSetpoint() + '&field3=' + heatStatus)
-//   const req = https.request(options, (res) => {
-//     logger.info(res.statusMessage)
-//   })
-//   req.on('error', (e) => {
-//     logger.error(e)
-//   })
-//   req.end()
-//     var options2 = {
-// 	"method": "POST",
-// 	"hostname": "eu-central-1-1.aws.cloud2.influxdata.com",
-// 	"path": "/api/v2/write?org=petmo338@gmail.com&bucket=ferment&precision=s",
-// 	"headers": {
-// 	    "Authorization": "Token rg6f9mBv4G0r3ze2iIwArhIv_y1bD7ZUPne09EwtLAVjiu92q4ztad4IBTGrjoaoDx9EeaEpaJXJS02Gn9UZBQ==",
-// 	    'Content-Type': 'text/plain'
-// 	}
-//     }
-
-//     var req2 = https.request(options2, function (res) {
-// 	console.log(`STATUS: ${res.statusCode}`)
-// 	console.log(`HEADERS: ${JSON.stringify(res.headers)}`)
-// 	var chunks = []
-
-// 	res.on("end", function () {
-// 	    logger.info('res.on.end')
-// 	    logger.info(res.status)
-// 	})
-//     })
-
-//     req2.write("temp value="+tempCelsius)
-//     req2.on('error', (e) => {
-// 	console.log(e)
-//     })
-   
-//     req2.end()
-
-//     io.emit('status', { tempBarrel: tempCelsius, setPoint: getSetpoint(), heatStatus: heatStatus })
-// }
-
-// const influx = new Influx.InfluxDB({
-//   host: dbHost,
-//   database: dbName,
-//   schema: [
-//       {
-// 	  measurement: measurementName,
-// 	  fields: {
-//               bpm: Influx.FieldType.FLOAT,
-//               plaatotemp: Influx.FieldType.FLOAT,
-//               sg: Influx.FieldType.FLOAT,
-//               bubbles: Influx.FieldType.FLOAT,
-//               abv: Influx.FieldType.FLOAT,
-//               og: Influx.FieldType.FLOAT,
-//               co2volume: Influx.FieldType.FLOAT,
-// 	      tempBarrel: Influx.FieldType.FLOAT,
-// 	      setPoint: Influx.FieldType.FLOAT,
-// 	      heatStatus: Influx.FieldType.INTEGER
-// 	  },
-// 	  tags: [
-// 	      'device'
-// 	  ]
-//       }
-//   ]
-// })
-
-// influx.getDatabaseNames()
-//   .then(names => {
-//     if (!names.includes(dbName)) {
-//       return influx.createDatabase(dbName)
-//     }
-//   })
-//   .catch(err => {
-//     console.error('Error creating Influx database!')
-//   })
-
-// setInterval(measure, 10000)
 setInterval(control, 200)
-// setInterval(report, 15000)
-
-
-// create an express app
 const app = express()
 
 app.use(express.json()) // for parsing application/json
 app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
 
 const localHostName = os.hostname()
-// send `index.html` from the current directory
-// when `http://<ip>:9000/` route is accessed using `GET` method
+
 app.get('/', function (req, res) {
   console.log(req.body)
   response = {
@@ -228,6 +124,9 @@ app.get('/', function (req, res) {
     'timeUTC': new Date(new Date().toUTCString()),
     'setPoint1': setPoint,
     'currentTemp1': currentTemp,
+    'heatStatus': heatStatus,
+    'heatStatusName': getHeatStatusName(),
+    'P': P,
     'extra': 'blah'
   }
   res.send(response)
@@ -249,6 +148,23 @@ app.get('/setPoint', function (req, res) {
   res.send(response)
 })
 
+app.get('/heatStatus', function (req, res) {
+  console.log(req.body)
+  response = {
+    'heatStatus': heatStatus,
+    'heatStatusName': getHeatStatusName()
+  }
+  res.send(response)
+})
+
+app.get('/P', function (req, res) {
+  console.log(req.body)
+  response = {
+    'P': P
+  }
+  res.send(response)
+})
+
 app.post('/setPoint', function (req, res) {
   console.log(req.body)
   tempSP = parseFloat(req.body.setPoint1)
@@ -264,37 +180,19 @@ app.post('/setPoint', function (req, res) {
   }
 })
 
-// // send asset files
-// app.use( '/assets/', express.static( path.resolve( __dirname, 'assets' ) ) )
-// app.use( '/assets/', express.static( path.resolve( __dirname, 'node_modules/socket.io-client/dist' ) ) )
+app.post('/setP', function (req, res) {
+  console.log(req.body)
+  tempP = parseFloat(req.body.setPoint1)
+  console.log(tempP)
+  if (tempP != NaN) {
+    P = tempP
+    response = {
+      'P': P
+    }
+    res.send(response)
+  } else {
+    res.status(400).send('Bad Request')  
+  }
+})
 
-// server listens on `9000` port
 const server = app.listen( 9000, () => console.log( 'Express server started!' ) )
-
-// create a WebSocket server
-// const io = socketIO( server )
-
-// // listen for connection
-// io.on( 'connection', ( client ) => {
-//   console.log( 'SOCKET: ', 'A client connected', client.id )
-
-//   // client.on( 'get-setPoint', ( data ) => {
-//   //   console.log( 'Received get-setPoint event.' )
-//   //   toggle( data.r, data.g, data.b ) // toggle LEDs
-//   // } )
-//   client.on( 'set-setPoint', ( data ) => {
-//     console.log( 'Received set-setPoint event.' )
-//     let setPointChanged = false
-//     // if (setPoint !== data.setPoint) {
-//     //   setPointChanged = true
-//     // } else {
-//     //   setPointChanged = false
-//     // }
-//     setPoint = data.setPoint // toggle LEDs
-//     // if (setPointChanged) {
-//     //   io.emit('setPoint-changed', {setPoint: setPoint})
-//     // }
-
-//   } )
-
-// } )
