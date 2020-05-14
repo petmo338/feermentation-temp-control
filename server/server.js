@@ -11,7 +11,7 @@ logger.level = 'warning'
 logger.debug("Some debug messages") 
 const MCP9808_ADDR = 0x18
 const TEMP_REG = 0x05
-const P = 1.00001
+let P = 1.00001
 var heatStatus = 1
 let setPoint = 23.123
 let currentTemp = 0
@@ -180,9 +180,9 @@ app.post('/setPoint', function (req, res) {
   }
 })
 
-app.post('/setP', function (req, res) {
+app.post('/P', function (req, res) {
   console.log(req.body)
-  tempP = parseFloat(req.body.setPoint1)
+  tempP = parseFloat(req.body.P)
   console.log(tempP)
   if (tempP != NaN) {
     P = tempP
