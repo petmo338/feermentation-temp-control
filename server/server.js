@@ -117,6 +117,12 @@ app.use(express.urlencoded({ extended: true })) // for parsing application/x-www
 
 const localHostName = os.hostname()
 
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*") // update to match the domain you will make the request from
+  res.header("Access-Control-Allow-Headers", "*")
+  next()
+})
+
 app.get('/', function (req, res) {
   console.log(req.body)
   response = {
