@@ -2,6 +2,7 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import http from 'http'
+import { string } from 'postcss-selector-parser'
 
 Vue.use(Vuex)
 
@@ -20,42 +21,51 @@ const store = new Vuex.Store({
     }
   },
   actions: {
-    getTemp ({ commit}) {
-      const options = {
-        hostname: '172.16.200.200',
-        port: 9000,
-        path: '/currentTemp',
-        method: 'GET',
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': '*'
-        }
-      }
-      
-      const req = http.request(options, res => {
-        console.log(`statusCode: ${res.statusCode}`)
-        console.log(res)
-        res.on('data', d => {
-          console.log(JSON.parse(d))
-          let temp = parseFloat(JSON.parse(d).currentTemp1)
-          if (!isNaN(temp)) {
-            commit('currTemp', temp)
-          } else {
-            console.error('Unparseable float: ' + d.currentTemp1)
-          }
-        })
-      })
-      
-      req.on('error', error => {
-        console.error(error)
-      })
-      
-      req.end()
+    getTemp ({ commit }) {
+      commitAPIFloat(commit, '/currentTemp', 'currentTemp1', 'currTemp')
+    },
+    getSetpoint ({ commit}) {
+      commitAPIFloat(commit, '/setPoint', 'setPoint1', 'setTemp')
     }
   },
   modules: {
   }
 })
+
+async function commitAPIFloat(commit, endpoint, valueName, storeName) {
+  // console.log(valueName)
+  const options = {
+    hostname: '172.16.200.200',
+    port: 9000,
+    path: endpoint,
+    method: 'GET',
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': '*'
+    }
+  }
+  
+  const req = http.request(options, res => {
+    // console.log(`statusCode: ${res.statusCode}`)
+    // console.log(res)
+    res.on('data', d => {
+      console.log(JSON.parse(d))
+      let value = parseFloat(JSON.parse(d)[valueName])
+      if (!isNaN(value)) {
+        commit(storeName, value)
+      } else {
+        console.error('Unparseable float (' + string(valueName) + '): ' + d[valueName])
+      }
+    })
+  })
+  
+  req.on('error', error => {
+    console.error(error)
+  })
+  
+  req.end()
+  return undefined
+}
 
 export default store
 

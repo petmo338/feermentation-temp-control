@@ -18,8 +18,9 @@ export default {
   //   }
   // },
   name: 'Temperature',
-  // mounted: {
-  // },
+  mounted: function () {
+    this.$store.dispatch('getSetpoint')
+  },
   computed: {
     currTemp: function () {
       return this.$store.state.currentTemp
