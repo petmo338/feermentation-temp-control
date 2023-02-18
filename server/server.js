@@ -10,7 +10,7 @@ var os = require('os')
 var logger = log4js.getLogger()
 const {InfluxDB, Point, HttpError} = require('@influxdata/influxdb-client')
 
-logger.level = 'debug'
+logger.level = 'error'
 logger.debug("Some debug messages") 
 const MCP9808_ADDR = 0x18
 const TEMP_REG = 0x05
