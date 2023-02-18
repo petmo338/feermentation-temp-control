@@ -185,7 +185,7 @@ setInterval(function () {
     axios.post('http://log.brewfather.net/stream?id=n7TZFmH3iwDOuq',
 	       { name: "fermentationTempController",
 		 aux_temp: setPoint,
-		 temp: currentTemp,
+		 ext_temp: currentTemp,
 		 temp_unit: "C",
 		 heatStatus: 2
 	       })
