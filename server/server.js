@@ -1,20 +1,29 @@
+require('dotenv').config()
 const i2c = require('i2c-bus')
 const path = require('path')
 const express = require('express')
-
-var gpio = require('gpio')
+const Influx = require('influx')
+const axios = require('axios')
+const gpio = require('./gpio')
 var log4js = require('log4js')
 var os = require('os')
 var logger = log4js.getLogger()
+const {InfluxDB, Point, HttpError} = require('@influxdata/influxdb-client')
 
-logger.level = 'warning'
+logger.level = 'debug'
 logger.debug("Some debug messages") 
 const MCP9808_ADDR = 0x18
 const TEMP_REG = 0x05
-let P = 1.00001
+let P = 0.00001
 var heatStatus = 1
-let setPoint = 23.123
+let setPoint = 22.123
 let currentTemp = 0
+const measurementName = 'testOne'
+const dbName = 'ferment'
+const dbHost = '172.16.201.17'
+const GPIO_1 = 17
+const GPIO_2 = 18
+
 
 const i2c2 = i2c.openSync(1)
 
@@ -29,44 +38,40 @@ const toCelsius = (rawData) => {
   return celsius
 }
 
-var gpio115 = gpio.export(18, {
-  direction: gpio.DIRECTION.OUT,
-  interval: 200,
+const gpio17 = new gpio.gpio()
+const gpio18 = new gpio.gpio()
+gpio17.export(GPIO_1)
+gpio18.export(GPIO_2)
 
-  ready: function() {
-    logger.info('GPIO pin enabled 18')
-    disable()
+// process.on('exit', function() {
+//  gpio.destroy()
+// })
+
+function displayGpioError(error) {
+  logger.error('GPIO activity')
+  if (error) {
+    logger.error('GPIO:' + error)
   }
-})
-
-var gpio49 = gpio.export(17, {
-  direction: gpio.DIRECTION.OUT,
-  interval: 200,
-
-  ready: function() {
-    logger.info('GPIO pin enabled 17')
-    disable()
-  }
-})
+}
 
 function enableCooling() {
   logger.info('enable cooling')
-  gpio115.set()
-  gpio49.reset()
+  gpio17.unset()
+  gpio18.set()
   heatStatus = 0
 }
 
 function enableHeating() {
   logger.info('enable heating')
-  gpio115.reset()
-  gpio49.set()
+  gpio17.set()
+  gpio18.unset()
   heatStatus = 2
 }
 
 function disable() {
   logger.info('stop action')
-  gpio115.set()
-  gpio49.set()
+  gpio17.unset()
+  gpio18.unset()
   heatStatus = 1
 }
 
@@ -85,7 +90,7 @@ function getHeatStatusName() {
 async function measure() {
   if (i2c2) {
     var rawData = i2c2.readWordSync(MCP9808_ADDR, TEMP_REG) // , (err, rawData) => {
-    logger.info(rawData)
+    logger.info('Raw data: ' + rawData)
     return toCelsius(rawData)
   }
 }
@@ -110,6 +115,84 @@ async function control() {
 }
 
 setInterval(control, 200)
+
+async function report() {
+  // var tempCelsius = await measure()
+  logger.info(currentTemp + '------------------------------------')
+
+  const point1 = new Point('temperature')
+    .floatField('tempBarrel', currentTemp)
+    .floatField('setPoint', setPoint)
+    .intField('heatStatus', heatStatus)
+  logger.info(writeApi.writePoint(point1))
+
+//  influx.writePoints([
+//    {
+//      measurement: measurementName,
+//      tags: { device: 'bbb1' },
+//        fields: { tempBarrel: currentTemp, setPoint: setPoint, heatStatus: heatStatus },
+//    }
+//  ]).catch(err => {
+//    logger.error('Error saving data to InfluxDB!' + err.stack)
+//  })
+
+}
+
+const writeApi = new InfluxDB({url: process.env.URL, token: process.env.TOKEN}).getWriteApi('primary', process.env.BUCKET, 'ms')
+// setup default tags for all writes through this API
+writeApi.useDefaultTags({location: os.hostname()})
+
+
+const influx = new Influx.InfluxDB({
+  host: dbHost,
+  database: dbName,
+  schema: [
+      {
+	  measurement: measurementName,
+	  fields: {
+              bpm: Influx.FieldType.FLOAT,
+              plaatotemp: Influx.FieldType.FLOAT,
+              sg: Influx.FieldType.FLOAT,
+              bubbles: Influx.FieldType.FLOAT,
+              abv: Influx.FieldType.FLOAT,
+              og: Influx.FieldType.FLOAT,
+              co2volume: Influx.FieldType.FLOAT,
+	      tempBarrel: Influx.FieldType.FLOAT,
+	      setPoint: Influx.FieldType.FLOAT,
+	      heatStatus: Influx.FieldType.INTEGER
+	  },
+	  tags: [
+	      'device'
+	  ]
+      }
+  ]
+})
+
+// influx.getDatabaseNames()
+//   .then(names => {
+//     if (!names.includes(dbName)) {
+//       return influx.createDatabase(dbName)
+//     }
+//   })
+//   .catch(err => {
+//     console.error('Error creating Influx database!')
+//   })
+
+setInterval(report, 15000)
+
+setInterval(function () {
+    console.log('Log to brewfather')
+    axios.post('http://log.brewfather.net/stream?id=n7TZFmH3iwDOuq',
+	       { name: "fermentationTempController",
+		 aux_temp: setPoint,
+		 temp: currentTemp,
+		 temp_unit: "C",
+		 heatStatus: 2
+	       })
+	.then((response) => { console.log(response) }
+	     )},
+	    1000*60*20)
+
 const app = express()
 
 app.use(express.json()) // for parsing application/json
@@ -201,4 +284,4 @@ app.post('/P', function (req, res) {
   }
 })
 
-const server = app.listen( 9000, () => console.log( 'Express server started!' ) )
+const server = app.listen( 80, () => console.log( 'Express server started!' ) )
